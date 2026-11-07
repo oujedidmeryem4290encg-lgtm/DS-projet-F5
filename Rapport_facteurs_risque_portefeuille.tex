@@ -1,0 +1,332 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\setdefaultlanguage{french}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+\usepackage{setspace}
+\setstretch{1.08}
+
+\newcommand{\alphap}{\alpha}
+\newcommand{\Rp}{R_p}
+\newcommand{\Rf}{R_f}
+
+\title{\textbf{Facteurs de risque d'un portefeuille :\\le marché, la taille et la valeur expliquent-ils la rentabilité ?}\\[0.4em]\large Rapport de TP -- modèle de Fama et French à trois facteurs}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent Ce rapport étudie si la rentabilité d'un portefeuille de dix grandes entreprises américaines (janvier 2015 -- décembre 2025, 132 mois) s'explique par trois facteurs : le marché, la taille et la valeur. Une régression linéaire multiple par moindres carrés ordinaires est estimée sur les rendements mensuels en excès du taux sans risque, puis comparée à un modèle à un seul facteur (CAPM) et à une référence sans facteur. Le modèle à trois facteurs explique environ 79\,\% de la variance (R² ajusté de 0,788, contre 0,606 pour le CAPM). Le portefeuille est moins sensible que le marché ($\beta = 0{,}75$), orienté vers les grandes capitalisations ($\beta_{SMB} = -0{,}27$) et vers le style « valeur » ($\beta_{HML} = 0{,}45$). L'alpha est proche de zéro (0,057\,\% par mois) et statistiquement non significatif : son intervalle de confiance à 95\,\% est $[-0{,}274\,;\,0{,}389]$. La rentabilité moyenne du portefeuille est donc attribuable à son exposition aux facteurs de risque, et non à une performance « anormale ».
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%--------------------------------------------------------------------
+\section{Introduction et question de recherche}
+
+La question posée est la suivante : \emph{la rentabilité d'un portefeuille s'explique-t-elle par le marché, la taille et la valeur ?} Le modèle d'évaluation des actifs financiers (CAPM) attribue le rendement d'un titre à sa seule sensibilité au marché. Fama et French (1993) montrent qu'ajouter deux facteurs, la taille et la valeur, améliore nettement l'explication des rendements. Le modèle estimé est :
+\begin{equation}
+\Rp - \Rf = \alpha + \beta_1\,(R_m - \Rf) + \beta_2\,\mathrm{SMB} + \beta_3\,\mathrm{HML} + \varepsilon,
+\label{eq:ff3}
+\end{equation}
+où $\Rp$ est le rendement mensuel du portefeuille, $\Rf$ le taux sans risque, et :
+\begin{itemize}
+  \item $R_m-\Rf$ (\emph{Mkt-RF}) est la prime de risque du marché ;
+  \item \emph{SMB} (\emph{Small Minus Big}) est le rendement des petites capitalisations moins celui des grandes ;
+  \item \emph{HML} (\emph{High Minus Low}) est le rendement des titres « valeur » (rapport valeur comptable sur prix élevé) moins celui des titres « croissance ».
+\end{itemize}
+Le coefficient $\alpha$ (l'alpha) mesure la part de rendement non expliquée par les facteurs ; les $\beta_i$ (les bêtas) mesurent la sensibilité du portefeuille à chaque facteur. L'objectif est \textbf{explicatif} : on cherche à comprendre d'où vient la rentabilité passée, et non à prévoir la rentabilité future.
+
+%--------------------------------------------------------------------
+\section{Données et méthodologie}
+
+\subsection{Sources}
+\begin{itemize}
+  \item \textbf{Facteurs} : les facteurs mensuels de Fama et French (Mkt-RF, SMB, HML et taux sans risque RF, en pourcentage) sont téléchargés depuis le site de l'Université Dartmouth (fichier \texttt{F-F\_Research\_Data\_Factors\_CSV.zip}, décompressé dans le notebook).
+  \item \textbf{Portefeuille} : les cours de clôture ajustés (dividendes et divisions inclus), à fréquence mensuelle, proviennent de Yahoo Finance via la bibliothèque \texttt{yfinance}.
+\end{itemize}
+
+\subsection{Composition du portefeuille}
+Le portefeuille est constitué de dix grandes entreprises américaines de six secteurs, déjà cotées en 2015, avec une \textbf{pondération égale} (10\,\% chacune), rééquilibrée chaque mois.
+
+\begin{table}[H]
+\centering
+\caption{Composition du portefeuille}
+\begin{tabular}{lll}
+\toprule
+Ticker & Entreprise & Secteur \\
+\midrule
+XOM & Exxon Mobil & Énergie \\
+CVX & Chevron & Énergie \\
+JPM & JPMorgan Chase & Finance \\
+JNJ & Johnson \& Johnson & Santé \\
+PFE & Pfizer & Santé \\
+PG & Procter \& Gamble & Consommation de base \\
+WMT & Walmart & Consommation de base \\
+KO & Coca-Cola & Consommation de base \\
+GE & General Electric & Industrie \\
+T & AT\&T & Télécommunications \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Préparation des données}
+Les rendements mensuels du portefeuille sont calculés en pourcentage ($\mathrm{pct\_change} \times 100$), puis alignés sur les dates des facteurs au format année-mois (AAAAMM) par une fusion interne. Le rendement en excès est $\Rp - \Rf$. Après fusion et nettoyage, l'échantillon compte \textbf{132 observations mensuelles} (janvier 2015 à décembre 2025), sans valeur manquante.
+
+\subsection{Modèles estimés}
+Trois modèles sont comparés par moindres carrés ordinaires (MCO, bibliothèque \texttt{statsmodels}) :
+\begin{enumerate}
+  \item une \textbf{référence} sans facteur : $\Rp - \Rf = \alpha + \varepsilon$ (l'alpha est alors la moyenne du rendement en excès) ;
+  \item le \textbf{CAPM} à un facteur : $\Rp - \Rf = \alpha + \beta\,(R_m-\Rf)+\varepsilon$ ;
+  \item le modèle de \textbf{Fama-French à trois facteurs} (équation~\ref{eq:ff3}).
+\end{enumerate}
+Les modèles sont comparés par le R² ajusté, le critère d'information d'Akaike (AIC), un test F de modèles emboîtés, des écarts-types robustes (Newey-West) et une évaluation hors échantillon (découpage chronologique 75\,\%/25\,\%).
+
+%--------------------------------------------------------------------
+\section{Analyse descriptive}
+
+\subsection{Rendements des titres et du portefeuille}
+Le tableau~\ref{tab:desc} résume les rendements mensuels. Le portefeuille a un rendement moyen de 0,96\,\% par mois et un écart-type de 4,05\,\%, nettement inférieur à celui de chaque titre pris isolément (de 4,5\,\% pour KO et PG à 10,1\,\% pour GE). C'est l'effet de la \textbf{diversification}.
+
+\begin{table}[H]
+\centering
+\caption{Statistiques descriptives des rendements mensuels (\%), 132 mois}
+\label{tab:desc}
+\begin{tabular}{lrrrr}
+\toprule
+ & Moyenne & Écart-type & Minimum & Maximum \\
+\midrule
+XOM & 0,84 & 7,62 & $-26{,}19$ & 26,92 \\
+JPM & 1,72 & 6,96 & $-22{,}46$ & 21,54 \\
+JNJ & 0,86 & 4,64 & $-12{,}15$ & 14,42 \\
+PG & 0,68 & 4,61 & $-9{,}14$ & 13,14 \\
+WMT & 1,34 & 5,41 & $-15{,}62$ & 12,87 \\
+GE & 1,33 & 10,11 & $-26{,}95$ & 37,20 \\
+T & 0,76 & 5,98 & $-17{,}23$ & 20,95 \\
+KO & 0,75 & 4,53 & $-16{,}55$ & 12,89 \\
+CVX & 0,89 & 7,81 & $-22{,}37$ & 27,28 \\
+PFE & 0,42 & 6,42 & $-14{,}38$ & 23,92 \\
+\midrule
+\textbf{Portefeuille} & \textbf{0,96} & \textbf{4,05} & $\mathbf{-13{,}34}$ & \textbf{15,79} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Rendement cumulé}
+La figure~\ref{fig:cumul} compare le rendement cumulé du portefeuille à celui du marché. Sur la période, le portefeuille cumule environ $+217\,\%$ contre environ $+295\,\%$ pour le marché. Il évolue de façon plus régulière que le marché, avec un net décrochage en 2020, et fait moins bien que lui sur l'ensemble de la période, l'écart se creusant surtout à partir de 2024.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{fig/cumul.png}
+\caption{Rendement cumulé du portefeuille et du marché (\%), 2015--2025.}
+\label{fig:cumul}
+\end{figure}
+
+\subsection{Distribution et liens avec les facteurs}
+La figure~\ref{fig:distrib} montre la distribution du rendement en excès (à gauche) et sa relation avec la prime de risque du marché (à droite). La relation avec le marché est nettement croissante et approximativement linéaire. La pente de la droite de régression simple est le bêta de marché du CAPM.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.48\textwidth]{fig/hist.png}\hfill
+\includegraphics[width=0.48\textwidth]{fig/scatter.png}
+\caption{À gauche : distribution du rendement mensuel en excès du portefeuille. À droite : rendement en excès contre Mkt-RF, avec droite de régression.}
+\label{fig:distrib}
+\end{figure}
+
+La figure~\ref{fig:corr} présente les boîtes à moustaches et la matrice de corrélation. Le rendement en excès du portefeuille est fortement corrélé au marché ($0{,}78$), modérément à HML ($0{,}40$) et faiblement à SMB ($0{,}11$). Les trois facteurs sont peu corrélés entre eux (au plus $0{,}31$ entre Mkt-RF et SMB), ce qui exclut un problème de multicolinéarité : leurs bêtas peuvent être estimés séparément. Le nombre de conditionnement du modèle est d'ailleurs faible ($4{,}85$).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig/box_corr.png}
+\caption{Boîtes à moustaches des rendements mensuels (\%) et matrice de corrélation.}
+\label{fig:corr}
+\end{figure}
+
+%--------------------------------------------------------------------
+\section{Résultats}
+
+\subsection{Estimation des trois modèles}
+Le tableau~\ref{tab:modeles} présente les résultats. Entre parenthèses, les p-values.
+
+\begin{table}[H]
+\centering
+\caption{Résultats des régressions MCO (rendement mensuel en excès, \%), $N=132$}
+\label{tab:modeles}
+\begin{tabular}{lrrr}
+\toprule
+ & Référence & CAPM & Fama-French \\
+\midrule
+Alpha (\% par mois) & 0,800 & 0,104 & 0,057 \\
+\quad p-value de l'alpha & (0,025) & (0,648) & (0,733) \\
+\quad IC à 95\,\% de l'alpha & $[0{,}104\,;\,1{,}497]$ & $[-0{,}344\,;\,0{,}552]$ & $[-0{,}274\,;\,0{,}389]$ \\
+Bêta Mkt-RF & -- & 0,704 & 0,753 \\
+\quad p-value & -- & ($<0{,}001$) & ($<0{,}001$) \\
+Bêta SMB & -- & -- & $-0{,}265$ \\
+\quad p-value & -- & -- & ($<0{,}001$) \\
+Bêta HML & -- & -- & 0,446 \\
+\quad p-value & -- & -- & ($<0{,}001$) \\
+\midrule
+R² & 0,000 & 0,609 & 0,793 \\
+R² ajusté & 0,000 & 0,606 & 0,788 \\
+AIC & 744,6 & 622,7 & 542,7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Interprétation}
+
+\paragraph{Marché.} Le bêta de marché du modèle à trois facteurs est de $0{,}753$ (intervalle de confiance à 95\,\% : $[0{,}678\,;\,0{,}828]$), très significatif et nettement inférieur à $1$. Le portefeuille est donc \textbf{moins sensible que le marché} : une hausse de $1\,\%$ de la prime de risque du marché s'accompagne en moyenne d'une hausse d'environ $0{,}75\,\%$ du portefeuille. C'est cohérent avec la composition (consommation de base, santé, énergie), plutôt défensive.
+
+\paragraph{Taille.} Le bêta SMB est de $-0{,}265$ ($[-0{,}389\,;\,-0{,}142]$), significatif. Un coefficient négatif signifie que le portefeuille se comporte comme les \textbf{grandes capitalisations}, ce qui correspond à des entreprises de très grande taille.
+
+\paragraph{Valeur.} Le bêta HML est de $0{,}446$ ($[0{,}359\,;\,0{,}532]$), significatif. Le portefeuille est donc orienté vers le style \textbf{valeur} (titres à faible valorisation relative), plutôt que vers la croissance.
+
+\paragraph{Alpha.} L'alpha du modèle à trois facteurs est de $0{,}057\,\%$ par mois, soit environ $0{,}7\,\%$ par an, avec un intervalle de confiance à 95\,\% de $[-0{,}274\,;\,0{,}389]$ et une p-value de $0{,}733$. Il \textbf{n'est pas significativement différent de zéro}. Le résultat le plus instructif vient de la comparaison avec la référence : la rentabilité moyenne en excès du portefeuille, de $0{,}80\,\%$ par mois, est significative (p-value de $0{,}025$), mais cet alpha « brut » disparaît dès que l'on tient compte du marché ($0{,}104\,\%$, p-value de $0{,}648$ avec le CAPM). La prime moyenne du portefeuille est donc la \textbf{rémunération de son exposition au risque de marché}, et non le signe d'une performance supérieure.
+
+\paragraph{Apport de la taille et de la valeur.} Le R² ajusté passe de $0{,}606$ (CAPM) à $0{,}788$ (trois facteurs), et l'AIC diminue de $622{,}7$ à $542{,}7$. Le test F de modèles emboîtés, qui teste $H_0:\beta_{SMB}=\beta_{HML}=0$, conduit à $F=56{,}91$ avec une p-value inférieure à $0{,}0001$ : \textbf{la taille et la valeur apportent une information significative} en plus du marché. Environ 61\,\% de la variance est expliquée par le marché seul, et 18 points supplémentaires par SMB et HML.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.55\textwidth]{fig/coefs.png}\hfill
+\includegraphics[width=0.42\textwidth]{fig/r2adj.png}
+\caption{À gauche : coefficients du modèle à trois facteurs avec leurs intervalles de confiance à 95\,\%. À droite : R² ajusté des trois modèles.}
+\label{fig:coefs}
+\end{figure}
+
+\subsection{Robustesse des tests}
+Les p-values du tableau~\ref{tab:modeles} supposent des erreurs de variance constante et sans autocorrélation. Le tableau~\ref{tab:hac} les compare à celles obtenues avec des écarts-types robustes de Newey-West (3 retards). Les conclusions sont identiques.
+
+\begin{table}[H]
+\centering
+\caption{p-values du modèle à trois facteurs : MCO et erreurs robustes (HAC)}
+\label{tab:hac}
+\begin{tabular}{lrrr}
+\toprule
+ & Coefficient & p-value (MCO) & p-value (HAC) \\
+\midrule
+Alpha & 0,0573 & 0,7329 & 0,7268 \\
+Mkt-RF & 0,7530 & $<0{,}0001$ & $<0{,}0001$ \\
+SMB & $-0{,}2654$ & $<0{,}0001$ & 0,0001 \\
+HML & 0,4456 & $<0{,}0001$ & $<0{,}0001$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Évaluation hors échantillon}
+Pour vérifier que l'ajustement ne vient pas d'un surajustement, les modèles sont estimés sur les 99 premiers mois, puis évalués sur les 33 derniers (découpage chronologique). Le tableau~\ref{tab:oos} compare l'erreur quadratique moyenne (RMSE) et le R² hors échantillon, défini par rapport à la référence.
+
+\begin{table}[H]
+\centering
+\caption{Performance hors échantillon (33 mois de test)}
+\label{tab:oos}
+\begin{tabular}{lrr}
+\toprule
+Modèle & RMSE (\%) & R² hors échantillon \\
+\midrule
+Référence & 2,988 & 0,000 \\
+CAPM & 2,631 & 0,225 \\
+Fama-French & 1,920 & 0,587 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Le classement des modèles est le même que dans l'échantillon : le modèle à trois facteurs réduit l'erreur de près de 36\,\% par rapport à la référence (RMSE de $1{,}92$ contre $2{,}99$) et bat nettement le CAPM. Il faut toutefois rester prudent : le test ne porte que sur 33 mois, et le modèle utilise les facteurs du \emph{même} mois. Il s'agit donc d'une mesure du pouvoir \emph{explicatif} et non d'une capacité de prévision, car les facteurs d'un mois à venir ne sont pas connus à l'avance.
+
+%--------------------------------------------------------------------
+\section{Diagnostics du modèle}
+
+\subsection{Analyse des résidus}
+La figure~\ref{fig:residus} présente les résidus du modèle à trois facteurs.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig/residus.png}
+\caption{Résidus du modèle à trois facteurs : contre les valeurs ajustées, distribution, diagramme quantile-quantile.}
+\label{fig:residus}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Tests sur les résidus du modèle à trois facteurs}
+\label{tab:diag}
+\begin{tabular}{lrl}
+\toprule
+Test & Valeur & Lecture \\
+\midrule
+Durbin-Watson & 1,74 & légère autocorrélation positive possible \\
+Jarque-Bera (normalité) & p = 0,019 & normalité rejetée à 5\,\% \\
+Breusch-Pagan (variance constante) & p = 0,089 & homoscédasticité non rejetée à 5\,\% \\
+Asymétrie / kurtosis & 0,26 / 4,08 & queues un peu épaisses \\
+Nombre de conditionnement & 4,85 & pas de multicolinéarité \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Les résidus ne présentent pas de structure visible en fonction des valeurs ajustées, et la variance paraît constante (Breusch-Pagan non significatif). En revanche, la normalité est rejetée à 5\,\% (p-value de $0{,}019$) : le diagramme quantile-quantile montre quelques observations extrêmes à droite (résidus d'environ 4,5 à 6,5\,\%), correspondant à des mois exceptionnels. Le Durbin-Watson de $1{,}74$ suggère une légère autocorrélation. Ces écarts expliquent le recours aux erreurs robustes de Newey-West, qui ne modifient pas les conclusions. Avec 132 observations, le théorème central limite rend en outre les tests sur les coefficients raisonnablement fiables malgré la non-normalité.
+
+\subsection{Stabilité des coefficients dans le temps}
+La figure~\ref{fig:rolling} présente les coefficients estimés sur une fenêtre glissante de 36 mois.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig/rolling.png}
+\caption{Coefficients du modèle à trois facteurs estimés sur fenêtre glissante de 36 mois.}
+\label{fig:rolling}
+\end{figure}
+
+Le bêta de marché est relativement stable (entre $0{,}55$ et $0{,}83$). En revanche, les bêtas SMB et HML évoluent nettement : le bêta SMB passe d'environ $-0{,}1$ à environ $-0{,}4$ ou $-0{,}5$ à partir de 2023, et le bêta HML augmente de $0{,}2$ à plus de $0{,}5$ sur la période. L'alpha oscille de part et d'autre de zéro (entre environ $-0{,}27$ et $+0{,}31$ \% par mois) sans tendance claire. L'hypothèse de coefficients constants est donc \textbf{une approximation} : les valeurs estimées sur toute la période sont des moyennes de régimes différents. Plusieurs explications sont possibles (évolution de la valorisation relative des secteurs, restructurations d'entreprises comme celles de GE et d'AT\&T, évolution de la composition des facteurs), mais ce rapport ne les teste pas.
+
+%--------------------------------------------------------------------
+\section{L'alpha peut-il venir du hasard ?}
+
+La consigne met en garde contre le fait qu'un alpha positif peut résulter du hasard. Pour mesurer l'incertitude de l'alpha sans hypothèse sur la forme des erreurs, un \emph{bootstrap} est réalisé : 2\,000 échantillons de 132 mois sont tirés avec remise, et le modèle est réestimé à chaque fois. L'intervalle de confiance à 95\,\% obtenu pour l'alpha est $[-0{,}269\,;\,0{,}371]$, très proche de l'intervalle théorique $[-0{,}274\,;\,0{,}389]$, ce qui conforte la robustesse de l'inférence.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{fig/bootstrap.png}
+\caption{Distribution bootstrap de l'alpha (2\,000 rééchantillonnages).}
+\label{fig:boot}
+\end{figure}
+
+La distribution des alphas bootstrap est centrée sur l'estimation ponctuelle et chevauche largement zéro : un alpha nul est parfaitement compatible avec les données. À titre d'illustration de l'incertitude, pour un mois fictif où Mkt-RF vaut $2\,\%$, SMB $0{,}5\,\%$ et HML $-1\,\%$, le modèle donne un rendement en excès attendu de $0{,}98\,\%$, avec un intervalle de prédiction à 95\,\% de $[-2{,}72\,;\,4{,}69]\,\%$ : même si les facteurs étaient connus, le rendement réalisé resterait très incertain.
+
+%--------------------------------------------------------------------
+\section{Limites}
+
+\begin{itemize}
+  \item \textbf{Biais de survie.} Le portefeuille est constitué d'entreprises qui existent encore aujourd'hui et qui sont toujours cotées. Les sociétés disparues, rachetées ou en difficulté sur la période en sont absentes, ce qui tend à \emph{surestimer} l'alpha. Ce biais est probablement atténué ici : la sélection repose sur la taille et l'ancienneté et non sur la performance passée, et plusieurs titres (GE, AT\&T, Pfizer) ont déçu. Il n'est pas éliminé pour autant, et l'alpha estimé ne peut pas être extrapolé à un investisseur qui aurait dû choisir ses titres en 2015.
+  \item \textbf{Un alpha positif peut venir du hasard.} Avec 132 observations, l'intervalle de confiance de l'alpha est large (environ $\pm 0{,}33\,\%$ par mois). Tester plusieurs portefeuilles ou plusieurs périodes augmenterait mécaniquement la probabilité d'obtenir un alpha « significatif » par chance. Ici, l'alpha n'est pas significatif, ce qui est cohérent avec cette prudence.
+  \item \textbf{Opérations sur titres.} Les cours ajustés de Yahoo Finance tiennent compte des dividendes et des divisions, mais pas nécessairement de toutes les scissions d'activité (par exemple GE HealthCare et GE Vernova pour General Electric, WarnerMedia pour AT\&T), ce qui peut fausser légèrement certains rendements.
+  \item \textbf{Portefeuille particulier.} Dix titres, tous « grandes capitalisations » à tendance défensive : les conclusions sur SMB et HML valent pour ce portefeuille, et non pour le marché américain en général. La pondération égale avec rééquilibrage mensuel ne tient pas compte des coûts de transaction.
+  \item \textbf{Modèle.} Trois facteurs seulement (pas de momentum, de rentabilité ni d'investissement) ; coefficients supposés constants alors que l'analyse glissante montre qu'ils varient ; normalité des résidus rejetée, d'où le recours à des écarts-types robustes.
+  \item \textbf{Nature de l'exercice hors échantillon.} Les facteurs sont ceux du mois évalué : l'évaluation mesure le pouvoir explicatif, pas la prévision.
+\end{itemize}
+
+%--------------------------------------------------------------------
+\section{Conclusion}
+
+La rentabilité du portefeuille s'explique \textbf{largement} par le marché, la taille et la valeur : le modèle de Fama et French à trois facteurs explique environ 79\,\% de la variance des rendements mensuels en excès, contre 61\,\% pour le CAPM, et ce gain est statistiquement significatif (test F, AIC, R² ajusté, évaluation hors échantillon). Le portefeuille se caractérise par une sensibilité au marché inférieure à un ($0{,}75$), un biais vers les grandes capitalisations ($-0{,}27$) et un biais « valeur » ($0{,}45$). L'alpha estimé (environ $0{,}06\,\%$ par mois, soit $0{,}7\,\%$ par an) n'est pas significativement différent de zéro : la rentabilité moyenne du portefeuille rémunère son exposition aux facteurs de risque et n'indique pas de performance anormale. Ces résultats sont robustes aux erreurs corrélées (Newey-West) et au bootstrap, mais ils doivent être interprétés avec prudence : échantillon de 132 mois, portefeuille de dix titres, biais de survie résiduel et coefficients qui varient dans le temps.
+
+\paragraph{Pistes d'amélioration.} Étendre le portefeuille (20 à 30 titres), comparer plusieurs périodes, ajouter les facteurs de momentum et de rentabilité (modèles à quatre ou cinq facteurs), et constituer le portefeuille selon une règle appliquée à la situation de fin 2014 pour limiter le biais de survie.
+
+\section*{Références et reproductibilité}
+\addcontentsline{toc}{section}{Références et reproductibilité}
+\begin{itemize}
+  \item Fama, E.~F. et French, K.~R. (1993). Common risk factors in the returns on stocks and bonds. \emph{Journal of Financial Economics}, 33(1), 3--56.
+  \item Données des facteurs : Kenneth R. French, \emph{Data Library}, Tuck School of Business, Dartmouth College.
+  \item Cours des titres : Yahoo Finance, via la bibliothèque Python \texttt{yfinance}.
+  \item Analyse réalisée dans le notebook \texttt{Facteurs\_de\_risque\_d\_un\_portefeuille.ipynb} (Python, \texttt{pandas}, \texttt{statsmodels}, \texttt{seaborn}). Les chiffres et figures de ce rapport proviennent de l'exécution de ce notebook.
+\end{itemize}
+
+\end{document}
